@@ -1,0 +1,282 @@
+# options(repos = c(CRAN = "@CRAN@", pik = "https://rse.pik-potsdam.de/r/packages"))
+# install.packages("lpjmlkit")
+# R-Skript LPJmL Auswertung
+# options(repos = c("@CRAN@",pik = "https://rse.pik-potsdam.de/r/packages"))
+
+### Install packages
+install.packages("lpjmlkit")
+install.packages("raster")
+install.packages("caTools")
+install.packages("trend")
+install.packages("maps")
+install.packages("reshape2")
+
+require(lpjmlkit)
+require(raster)
+require(caTools)
+require(trend)
+
+
+# setwd
+setwd("Documents/LPJmL/R/output_spinup/spinup1/gampe_baseline/")
+
+#read globalflux csv; first plot
+globalflux = read.csv("globalflux.csv",sep=",")
+plot(globalflux$GPP,col="darkgreen",t="l")
+long_term_gpp= runmean(globalflux$GPP,20,endrule = "mean",align="center")
+lines(long_term_gpp,col="black",lwd=2)
+
+## Mann-Kendall Trendbestimmung
+trend_mk = mk.test(long_term_gpp,alternative = "greater")
+
+mk_vec = c()
+for(i in 10:(length(long_term_gpp)-9)){
+  act_vec = long_term_gpp[c((i-9):(i+9))]   
+  mk_vec[i] = mk.test(act_vec,alternative="greater")$p.value
+}
+trend.col=ifelse(mk_vec <=0.05,"grey90","black")
+points(long_term_gpp,col=trend.col)
+
+
+### spatial binary files
+## "tutorial": 
+vignette("lpjml-data")
+
+## read meta data  
+read_meta("mgpp.bin.json")
+
+## read GPP grid
+## braucht: *.bin.json, *.bin, grid.bin, grid.bin.json
+gpp = read_io("mgpp.bin.json")
+gpp = transform(gpp,to = "lon_lat")
+gpp = transform(gpp, to ="year_month_day")
+
+gpp =subset(gpp, month = as.character(c(1,2,12)))  
+gpp =subset(gpp,lat = as.character(seq(-0.25, -83.75, -0.5)))
+
+plot(subset(gpp,year = as.character(c(2001))))
+str(gpp)
+unique(gpp$year)
+
+
+
+summary(gpp)
+
+
+ref = subset(gpp,year = as.character(1901:1950))
+fut = subset(gpp,year = as.character(2071:2100))
+
+
+ref_mean = as_raster(ref,
+                     aggregate = list(month = sum, year = mean, band = 1),
+                     na.rm = T
+                     )
+
+fut_mean = as_raster(fut,
+                     aggregate = list(month = sum, year = mean, band = 1),
+                     na.rm = T
+)
+
+gpp_dif = fut_mean - ref_mean
+
+col.bar = colorRampPalette(c("brown","white","darkgreen"))
+
+spplot(gpp_dif, col.regions = col.bar(21), zlim = c(-850,850), scales = list(draw = T),
+       xlab="lon (°)", ylab = "lat (°)")
+
+#### now as line plot ...
+gpp_vec = as_array(gpp, aggregate = list(
+                   lon = mean, lat = mean, month=sum
+                   ), na.rm = T
+                   )
+
+plot(gpp_vec, col="darkgreen", bty ="n", xlab ="year", ylab ="GPP (gC/m2/seasonal", t="l")
+lin_reg_line = lm(gpp_vec~c(1:200))
+abline(lin_reg_line, col="black")
+
+plot(gpp, aggregate = list(lon=mean, lat = mean, month=sum))
+
+gpp = read_io("mgpp.bin.json",
+              subset = list(year = as.character(1971:1990))
+              )
+vignette("lpjml-data")
+
+
+
+### Land Use File Part
+
+list.files()
+
+# cft_header_in = read_header("cft1700_2005_irrigation_systems_64bands.bin") # demasiado cpu
+cft_in = read_io("cft1700_2005_irrigation_systems_64bands.bin",
+                 name = "cft1700_2005_irrigation_systems_64bands.bin",
+                 descr = "LPJUSE",
+                 firstcell = 0, ncell = 67420, firstyear = 1700, nyear = 306, scalar = 0.001, nbands = 64,
+                 datatype = 1, order = 1,
+                 cellsize_lon = 0.5, cellsize_lat = 0.5,
+                 nstep = 1, endian = "little",
+                 subset = list(year = 306)
+                 )
+dim(cft_in)
+plot(cft_in)
+
+# Crop Functional Types (CFTs):
+# 1. temperate cereals
+# 2. rice
+# 3. maize
+# 4. tropical cereals
+# 5. pulses
+# 6. temperate roots
+# 7. tropical roots
+# 8. oil crops sunflower
+# 9. oil crops soybean
+# 10. oil crops groundnut
+# 11. oil crops rapeseed
+# 12. sugar cane
+# 13. other crops
+# 14. pasture/managed grass (C3/C4 mixed)
+# 15. bio-energy grass
+# 16. bio-energy tree
+
+act_band = 12                                          # Band 12 ist sugar cane
+lu_in = transform(cft_in, to = "lon_lat")
+
+act_y = subset(lu_in, band = act_band)     # landnutzungs-inputfile wird gesupsettet bzgl. des Bandes; es gibt dann nur noch ein Band
+
+grid_lpjml = read_io("grid.bin")
+
+act_ras = as_raster(act_y)
+color.bar = colorRampPalette(c("lightgrey","red","darkred"))
+spplot(act_ras, col.regions = color.bar(16))
+writeRaster(act_ras, filename = "cft_2005_band12.tif", format = "GTiff")    # Daten als GeoTiff speichern, dann kann es in GIS geöffnet werden
+
+
+# Bereich definieren, in dem sugar cane angebaut werden wird:
+lon.def = seq(-179.75,179.75,0.5)
+lat.def = seq(-10.25,10.25,0.5)
+act_coordbox = expand.grid(lon.def,lat.def)
+
+# Die Zellen mit Meer wieder raus aus dem Bereich:
+act_cell = cellFromXY(act_ras, act_coordbox)              # welche Zellen sind in dem Bereich enthalten
+act_ras[act_cell][!is.na(act_ras[act_cell])] = 1       # könnte man zB auch mit 1.2 Multiplizieren   # alle Zellen wo nicht NA ist, also die Land-Zellen, bekommen (NA Zellen (Meer) dürfen keine Werte bekommen)
+
+# Die nun ausgewählten Zellen mit Band 12 (sugar cane) belegen und Ergebnis darstellen:
+spplot(act_ras, col.regions = color.bar(16))
+writeRaster(act_ras, filename = "cft_2005_testfile_sugarcane.tif", format = "GTiff")
+
+raster_data2 = raster("cft_2005_testfile_sugarcane.tif")
+plot(raster_data2)
+grid_lpjml = read_io("grid.bin.json")
+grid_lpjml$data[,,1]
+dim(coordinates(raster_data2))
+coordinates(raster_data2)
+grid_lpjml$data[1,,]
+
+#grid erstellen
+grid_coords = paste(round(grid_lpjml$data[1,,],2), round(grid_lpjml$data[,,2],2), sep="_")
+ras_coords = paste(round(coordinates(raster_data2)[,1],2), round(coordinates(raster_data2)[,2],2), sep="_")
+dim(cft_in)
+
+cft_out = array(0,dim=(c(1,67420,64)))
+
+y = 1
+
+#Schleife um Array umzustrukturieren # y year, i cell, b band
+for(i in 1:67420){
+  for(b in 1:64){
+    cft_out[y,i,b] = as.numeric(cft_in$data[i,y,b])
+    names(cft_out[y,i,b]) = names(cft_in$data[i,y,b])
+    
+  }
+}
+length(ras_coords)
+### overlay cft_out with new edited values from raster
+# use matching coordinates to ensure correct placement
+# na nexten
+
+for(i in 1:length(ras_coords)){
+  if(is.na(match(ras_coords[i],grid_coords))){
+    next
+  }else{
+  cft_out[y,match(ras_coords[i],grid_coords),act_band] = raster_data2[i]
+  }
+}
+
+length(cft_out) # checkit
+dim(cft_out) # checkit
+
+### concatenate lu file
+### use raster-year as new year (y = 307)
+### wb write binary
+
+f.out <- file("cft_intmod24_new.bin", "wb")
+n_year_out = 307
+
+for(y in 1:n_year_out){
+  print(paste("Timestep (y)", y))
+  if(y<n_year_out){
+    cft_in_tmp = read_io("cft1700_2005_irrigation_systems_64bands.bin",
+                   name = "cft1700_2005_irrigation_systems_64bands.bin",
+                   descr = "LPJUSE",
+                   firstcell = 0, ncell = 67420, firstyear = 1700, nyear = 306, scalar = 0.001, nbands = 64,
+                   datatype = 1, order = 1,
+                   cellsize_lon = 0.5, cellsize_lat = 0.5,
+                   nstep = 1, endian = "little",
+                   subset = list(year = y)
+  )
+  for(i in 1:67420){
+    writeBin(as.integer(round(cft_in_tmp$data[i, 1, ]*1000)),f.out, size = 2, endian = "little", useBytes = TRUE)
+  }
+  
+}else{
+    for (i in 1:67420){
+      writeBin(as.integer(round(cft_out[1,i,]*1000)),f.out, size = 2, endian = "little", useBytes = TRUE)
+      
+    }
+  }
+}
+
+close(f.out)
+
+#write function to merge 2 binary files
+merge_binary_file = function(file1, file2, outputfile){
+  f1 = readBin(file1, what = "raw", n = file.info(file1)$size)
+  f2 = readBin(file2, what = "raw", n = file.info(file2)$size)
+  out_f = c(f1,f2)
+  writeBin(out_f, outputfile)
+}
+
+
+header_cft_out = create_header(
+  name = "LPJUSE",
+  version = 2,
+  order = 1,
+  firstyear = 1700,
+  nyear = 307,
+  firstcell = 0,
+  ncell = 67420,
+  nbands = 64,
+  cellsize_lon = 0.5,
+  scalar = 0.001,
+  cellsize_lat = 0.5,
+  datatype = 1,
+  nstep = 1,
+  endian = "little",
+  verbose = TRUE
+)
+
+write_header(filename = "landuse_header.bin", header = header_cft_out, overwrite = TRUE)
+merge_binary_file("landuse_header.bin", "cft_intmod24_new.bin", "cft_intmod24_final.bin")
+
+cft_new = read_io("cft_intmod24_final.bin",
+                     name = "cft_intmod24_final.bin",
+                     descr = "LPJUSE",
+                     firstcell = 0, ncell = 67420, firstyear = 1700, nyear = 307, scalar = 0.001, nbands = 64,
+                     datatype = 1, order = 1,
+                     cellsize_lon = 0.5, cellsize_lat = 0.5,
+                     nstep = 1, endian = "little",
+                     subset = list(year = 307)
+)
+
+plot(subset(cft_new, band=12))
+
