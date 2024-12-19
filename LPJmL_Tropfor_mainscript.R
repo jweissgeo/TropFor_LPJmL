@@ -142,7 +142,7 @@ act_coordbox = expand.grid(lon.def,lat.def)
 act_cell = cellFromXY(act_ras,act_coordbox)
 
 act_ras[act_cell][!is.na(act_ras[act_cell])] = 1
-
+Ich 
 spplot(act_ras)
 writeRaster(act_ras, paste0(local_path, "gampe_baseline/band12_modified2.tif"), overwrite = TRUE) # Achtung Overwrite = True !!!
 
@@ -261,6 +261,13 @@ plot(subset(cft_new,band=12))
 #################################
 ### Cropland Expansion Raster ###
 
+lon.def = seq(-179.75, 179.75, 0.5)
+lat.def = seq(-23.25, 23.25, 0.5)
+act_coordbox = expand.grid(lon.def,lat.def)
+
+
+
+
 # Raster laden
 Expansion_potential <- raster("Expansion_Potential/Figure_S3/integrated_expansion_potential.bil")
 
@@ -278,4 +285,27 @@ plot(trop_Expansion_potential,
      main = "Agricultural Expansion Potential (Tropen) (Zabel 2024)",
      col = col_palette(256),
      legend = TRUE)
+
+# Zielauflösung definieren (0.5° x 0.5°)
+target_res <- 0.5
+
+# Neues Raster mit der gewünschten Auflösung erstellen
+template_raster <- raster(extent(trop_Expansion_potential),
+                          res = target_res,
+                          crs = crs(trop_Expansion_potential))
+
+# Resampling des trop_Expansion_potential-Rasters auf 0.5° x 0.5°
+trop_Expansion_resampled <- resample(trop_Expansion_potential, template_raster, method = "bilinear")
+
+# Überprüfen der neuen Auflösung
+print(res(trop_Expansion_resampled))
+
+# Ergebnis plotten
+plot(trop_Expansion_resampled,
+     main = "Resampled Agricultural Expansion Potential (0.5° x 0.5°)",
+     col = col_palette(256),
+     legend = TRUE)
+
+# Resampeltes Raster speichern
+writeRaster(trop_Expansion_resampled, "Expansion_Potential/trop_Expansion_resampled_0.5deg.tif", format = "GTiff", overwrite = TRUE)
 
