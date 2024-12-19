@@ -9,8 +9,8 @@ require(trend)
 
 ### local path setzen, andere immer auskommentieren ###
 #local_path <- "C:/Users/philipp/Documents/TropFor_LPJmL_LokalData/" #philipp
-#local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
-local_path <- "C:/Dokumente/Umweltsysteme/integrierte_modellierung/"  # Mareike
+local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
+#local_path <- "C:/Dokumente/Umweltsysteme/integrierte_modellierung/"  # Mareike
 
 cft_header_in = read_header(paste0(local_path, "gampe_baseline/cft1700_2005_irrigation_systems_64bands.bin")) # LPJmL lokal
 
