@@ -1,12 +1,12 @@
 # R-Skript LPJmL Auswertung
 
-#testabc#
+#testnew
 require(lpjmlkit)
 require(raster)
 require(caTools)
 require(trend)
-
-local_path <- "/Users/epigo/Documents/LPJmL_Lokal/"
+local_path <- "C:/Users/philipp/Documents/TropFor_LPJmL_LokalData/" #philipp
+#local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
 globalflux <- read.csv(paste0(local_path, "gampe_baseline/globalflux.csv"), sep = ",")
 
 plot(globalflux$GPP,col="darkgreen",t="l")
@@ -142,7 +142,6 @@ act_coordbox = expand.grid(lon.def,lat.def)
 act_cell = cellFromXY(act_ras,act_coordbox)
 
 act_ras[act_cell][!is.na(act_ras[act_cell])] = 1
-Ich 
 spplot(act_ras)
 writeRaster(act_ras, paste0(local_path, "gampe_baseline/band12_modified2.tif"), overwrite = TRUE) # Achtung Overwrite = True !!!
 
