@@ -3,13 +3,11 @@
 .RData
 .Rproj.user/
 *.Rproj
-
 # Temporäre Dateien
 *.tmp
 *.log
-
 # Datenbankdateien
 *.sqlite
-
 # Verzeichnisse
 cache/
+.RDataTmp
