@@ -8,8 +8,9 @@ require(caTools)
 require(trend)
 
 ### local path setzen, andere immer auskommentieren ###
-local_path <- "C:/Users/philipp/Documents/TropFor_LPJmL_LokalData/" #philipp
+#local_path <- "C:/Users/philipp/Documents/TropFor_LPJmL_LokalData/" #philipp
 #local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
+local_path <- "C:/Dokumente/Umweltsysteme/integrierte_modellierung/"  # Mareike
 
 ### Start of the script; Einlesen der Daten
 globalflux <- read.csv(paste0(local_path, "gampe_baseline/globalflux.csv"), sep = ",")
@@ -33,7 +34,8 @@ points(long_term_gpp,col=trend.col)
 ## "tutorial": 
 vignette("lpjml-data")
 
-## read meta data  
+## read meta data 
+# paste0 klebt local_path und "..." zusammen zu einem Pfad
 read_meta(paste0(local_path, "gampe_baseline/mgpp.bin.json"))
 
 ## read GPP grid
