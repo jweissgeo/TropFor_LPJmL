@@ -51,9 +51,9 @@ vegc_trop = transform(vegc_trop, to = "lon_lat")          # räumliches
 vegc_trop = transform(vegc_trop, to = "year_month_day")   # zeitliches
 
 #lai_trop = subset(vegc_trop, lat = as.character(seq(-23.25,23.25,0.5)))     # nur der Tropenbereich
-vegc_trop = subset(vegc_trop, year = as.character(c(1909)), band = as.character("Tropical C4 grass"))    # nur 2006
+vegc_trop = subset(vegc_trop, year = as.character(c(2005)), band = as.character("tropical broadleaved evergreen tree"))    # nur 2006
 
-plot(vegc_trop, main = "FPC of 'Tropical C4 grass'")
+plot(vegc_trop, main = "'FPC tropical broadleaved evergreen tree'")
 
 
 #################loca ##############################################################
