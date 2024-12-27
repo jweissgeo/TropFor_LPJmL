@@ -118,7 +118,7 @@ barplot(area_by_cft, names.arg = 1:64,
 # Saven des neuen Raster-Stacks
 writeRaster(expanded_raster_stack, 
             filename = "Expansion_Potential/expanded_cropland_stack_simple.tif",
-            format = "GTiff", overwrite = TRUE)
+            format = "GTiff", overwrite = FALSE) #Achtung!!!!!
 
 ### Karte zur Darstellung ###
 # Kombinieren der Raster der Klassen 1-12 
