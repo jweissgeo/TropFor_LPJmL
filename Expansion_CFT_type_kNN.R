@@ -117,7 +117,7 @@ barplot(area_by_cft, names.arg = 1:64,
 
 # Saven des neuen Raster-Stacks
 writeRaster(expanded_raster_stack, 
-            filename = paste0(local_path, "gampe_baseline/expanded_cropland_stack_simple.tif"),
+            filename = "Expansion_Potential/expanded_cropland_stack_simple.tif",
             format = "GTiff", overwrite = TRUE)
 
 ### Karte zur Darstellung ###
