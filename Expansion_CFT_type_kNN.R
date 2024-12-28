@@ -2,6 +2,8 @@
 require(lpjmlkit)
 require(raster)
 require(FNN)
+library(leaflet)
+
 
 ### local path setzen, andere immer auskommentieren ###
 #local_path <- "C:/Users/philipp/Documents/TropFor_LPJmL_LokalData/" #philipp
@@ -64,7 +66,7 @@ train_coords <- train_coords[valid_train, ]
 # Definieren der dominierenden CFT-Klasse (mit Schwellenwert, um unrealistische Ergebnisse zu verhindern; nur jetzt schon hochskalierte Crops)
 train_classes <- apply(train_values, 1, function(row) {
   max_val <- max(row, na.rm = TRUE)
-  if (max_val >= 0.2) which.max(row) else NA #Schwellenwert 0.2
+  if (max_val >= 0.15) which.max(row) else NA #Schwellenwert 0.15
 })
 
 # Entfernen von Zellen ohne gültige dominierende Klasse
@@ -72,6 +74,32 @@ valid_train <- !is.na(train_classes)
 train_values <- train_values[valid_train, ]
 train_coords <- train_coords[valid_train, ]
 train_classes <- train_classes[valid_train]
+
+# Konvertiere die Daten in einen DataFrame
+"result_table <- data.frame(
+  train_coords,  # Koordinaten (x, y)
+  train_classes,  # Dominierende Klasse
+  train_values  # Werte der Bänder
+)"
+
+# Öffne die Tabelle in RStudio
+View(result_table)
+
+# Erstelle eine Liste der ursprünglichen Indizes der eingeschlossenen CFTs
+original_cfts <- include_cfts  # Diese enthält die ursprünglichen Indizes der Bänder
+
+# Mappe train_classes zurück zu den ursprünglichen CFT-Indices
+train_classes_original <- original_cfts[train_classes]
+
+# Konvertiere in einen DataFrame mit den originalen CFT-Indices
+result_table <- data.frame(
+  train_coords,  # Koordinaten
+  train_classes_original,  # Dominierende Klasse mit Originalindex
+  train_values  # Werte der Bänder
+)
+
+# Tabelle anzeigen
+View(result_table)
 
 ### Zielzellen vorbereiten ###
 # Extrahieren der Zielzellen basierend auf der Expansion Potential-Map
@@ -83,7 +111,7 @@ k <- 5  # Anzahl der Nachbarn die in die Berechnung einfließen
 knn_result <- knn(
   train = train_coords,
   test = target_coords,
-  cl = train_classes,
+  cl = train_classes_original,
   k = k
 )
 
@@ -101,7 +129,7 @@ for (i in 1:64) {
 
 ### Ergebnis plotten und speichern ###
 # Plot eines Beispiels
-plot(expanded_raster_stack[[12]], main = "Expansion für CFT12 - Sugarcane")
+plot(expanded_raster_stack[[4]], main = "Expansion für CFT18 - Rice")
 
 # Summe über alle Layer berechnen und plotten
 summed_raster <- calc(expanded_raster_stack, sum, na.rm = TRUE)
@@ -118,42 +146,70 @@ barplot(area_by_cft, names.arg = 1:64,
 # Saven des neuen Raster-Stacks
 writeRaster(expanded_raster_stack, 
             filename = "Expansion_Potential/expanded_cropland_stack_simple.tif",
-            format = "GTiff", overwrite = FALSE) #Achtung!!!!!
+            format = "GTiff", overwrite = TRUE) #Achtung!!!!!
 
 ### Karte zur Darstellung ###
-# Kombinieren der Raster der Klassen 1-12 
-# Extrahieren der Bänder 1-12 aus dem Raster-Stack
-cft_expansion_1_to_12 <- subset(expanded_raster_stack, 1:12)
+# Kombinieren der Raster der Klassen 1-12 und Klasse 18
+cft_expansion <- subset(expanded_raster_stack, c(1:12, 18))
 
 # Zusammenfügen der Klassen (jede Zelle wird der höchsten Klasse zugeordnet)
-combined_cft_raster <- which.max(cft_expansion_1_to_12)
+combined_cft_raster <- which.max(cft_expansion)
 
 ### Definition der Legende ###
-# Namen der CFT-Klassen (1-12)
+# Namen der CFT-Klassen (1-12 und 18)
 cft_names <- c(
   "Temperate Cereals", "Rice", "Maize", "Tropical Cereals",
   "Pulses", "Temperate Roots", "Tropical Roots",
   "Oil Crops Sunflower", "Oil Crops Soybean", 
-  "Oil Crops Groundnut", "Oil Crops Rapeseed", "Sugar Cane"
+  "Oil Crops Groundnut", "Oil Crops Rapeseed", "Sugar Cane",
+  "Rice (Surface Watering)"
 )
 
-# Farben für die CFT-Klassen
+# Farben für die CFT-Klassen (1-12 und 18)
 cft_colors <- c(
   "#1f78b4", "#33a02c", "#e31a1c", "#ff7f00",
   "#6a3d9a", "#b15928", "#a6cee3", "#b2df8a",
-  "#fb9a99", "#fdbf6f", "#cab2d6", "#ffff99"
+  "#fb9a99", "#fdbf6f", "#cab2d6", "#ffff99",
+  "#41ab5d"  # Farbe für "Rice (Surface Watering)"
 )
 
-### Karte erstellen ###
+# Überprüfe die Werte im Raster
+unique_values <- sort(unique(values(combined_cft_raster)))  # Eindeutige Werte im Raster (z. B. 1-13)
+
 # Plotten der kombinierten Karte
 plot(
-  combined_cft_raster, col = cft_colors, legend = FALSE,
-  main = "CFT Expansion der Klassen 1-12"
+  combined_cft_raster, col = cft_colors[unique_values], legend = FALSE,
+  main = "CFT Expansion der Klassen 1-12 und 18"
 )
 
-# Hinzufügen der Legende
+# Hinzufügen der Legende (nur für vorhandene Klassen)
 legend(
-  "topright", legend = cft_names, fill = cft_colors, 
-  title = "CFT Klassen", cex = 0.8, bty = "n"
+  "topright", legend = cft_names[unique_values], fill = cft_colors[unique_values], 
+  title = "CFT Klassen", cex = 0.6, bty = "n"
 )
+
+#### Leaflet Karte zum überprüfen
+
+
+### Konvertiere das kombinierte Raster in ein SpatialPointsDataFrame
+spdf <- as(combined_cft_raster, "SpatialPointsDataFrame")
+
+### Füge die Daten in ein DataFrame
+df <- as.data.frame(spdf)
+df$x <- coordinates(spdf)[, 1]  # x-Koordinaten (Longitude)
+df$y <- coordinates(spdf)[, 2]  # y-Koordinaten (Latitude)
+
+### Erstelle eine interaktive Leaflet-Karte
+leaflet(data = df) %>%
+  addTiles() %>%  # Basemap hinzufügen
+  addCircleMarkers(
+    ~x, ~y,  # Koordinaten
+    radius = 2,  # Größe der Punkte
+    stroke = FALSE,  # Keine Umrandung
+    fillOpacity = 0.7,
+    popup = ~paste(
+      "<b>Koordinaten:</b>", x, y, "<br>",
+      "<b>Dominierende Klasse:</b>", cft_names[df$layer]
+    )
+  )
 
