@@ -44,10 +44,13 @@ expansion_potential <- crop(
 # Resampling der Expansion Potentialkarte auf die Auflösung der CFT-Raster (auf 0.5 Grad)
 expansion_resampled <- resample(expansion_potential, cft_stack, method = "bilinear")
 
-# Schwellenwert definieren (Indexwert von 30 als Testwert, muss angepasst bzw. berechnet werden, um auf 15% Expansion zu kommen)
+### Bitte holze 15% ab -> Antwort ist Schwellenwert 30
+
+# Schwellenwert für Zabel-Index definieren (30 als Testwert, muss angepasst bzw. berechnet werden, um auf 15% Expansion zu kommen)
 threshold <- 30
 expansion_mask <- expansion_resampled > threshold  # Maske für Zielzellen
 
+plot(expansion_mask)
 
 ### Trainingsdaten für k- nearest neighbour vorbereiten ###
 # Indizes der auszuschließenden und eingeschlossenen CFTs
@@ -75,15 +78,15 @@ train_values <- train_values[valid_train, ]
 train_coords <- train_coords[valid_train, ]
 train_classes <- train_classes[valid_train]
 
-# Konvertiere die Daten in einen DataFrame
-"result_table <- data.frame(
+"# Konvertiere die Daten in einen DataFrame
+result_table <- data.frame(
   train_coords,  # Koordinaten (x, y)
   train_classes,  # Dominierende Klasse
   train_values  # Werte der Bänder
-)"
+)
 
 # Öffne die Tabelle in RStudio
-View(result_table)
+View(result_table)"
 
 # Erstelle eine Liste der ursprünglichen Indizes der eingeschlossenen CFTs
 original_cfts <- include_cfts  # Diese enthält die ursprünglichen Indizes der Bänder
@@ -129,7 +132,7 @@ for (i in 1:64) {
 
 ### Ergebnis plotten und speichern ###
 # Plot eines Beispiels
-plot(expanded_raster_stack[[4]], main = "Expansion für CFT18 - Rice")
+plot(expanded_raster_stack[[4]], main = "Expansion für CFT4 - tropical cereales")
 
 # Summe über alle Layer berechnen und plotten
 summed_raster <- calc(expanded_raster_stack, sum, na.rm = TRUE)
