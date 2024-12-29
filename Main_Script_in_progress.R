@@ -64,6 +64,10 @@ expansion_mask <- expansion_resampled > calculated_index  # Maske basierend auf 
 ### Plot der Expansion Mask ###
 plot(expansion_mask, main = paste("Expansion Mask mit Index", round(calculated_index, 2), ", bei Waldverlust", target_percent_loss, "%"))
 
+# zum Vergleich
+percent_forest <- forest_area * 100  # In Prozent umwandeln
+plot(percent_forest, main = "Prozentuale Gesamtwaldfläche")
+
 ### Weiter geht es mit dem kNN Algorythmus, der bestimmt, welche Croptypes angebaut werden sollen in der Flöche. Siehe anderes Srkipt
 ### Wird dann hier eingefügt
 
