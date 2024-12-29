@@ -47,7 +47,7 @@ local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
   forest_area <- rainforest_area + dryforest_area  # Gesamter tropischer Wald
   
 
-  # Dynamische Karten erstellen
+  # Karten erstellen
   percent_forest <- forest_area * 100  # In Prozent umwandeln
   percent_rainforest <- rainforest_area * 100
   percent_dryforest <- dryforest_area * 100
@@ -55,9 +55,9 @@ local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
   percent_free_veg <- free_vegetation * 100
   
 
-  plot(percent_dryforest)
-  plot(percent_forest)
-  plot(percent_rainforest)
-  plot(percent_cft)
-  plot(percent_free_veg)
+  plot(percent_dryforest, main = "Prozentuale Trockenwaldfläche")
+  plot(percent_forest, main = "Prozentuale Gesamtwaldfläche")
+  plot(percent_rainforest, main = "Prozentuale Regenwaldfläche")
+  plot(percent_cft, main = "Prozentuale Anbaufläche (CFT)")
+  plot(percent_free_veg, main = "Prozentuale freie Vegetationsfläche")
   
