@@ -40,11 +40,13 @@ local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
   fpc_tropical_forest <- read_io(paste0(local_path, "Model_Output/FPC_Test/fpc.bin.json"))
   fpc_rainforest <- crop(as_raster(subset(fpc_tropical_forest, band = "tropical broadleaved evergreen tree")), tropen_extent)
   fpc_dryforest <- crop(as_raster(subset(fpc_tropical_forest, band = "tropical broadleaved raingreen tree")), tropen_extent)
+  fpc_grassland <- crop(as_raster(subset(fpc_tropical_forest, band = "Tropical C4 grass")), tropen_extent)
   
   # 6. Waldflächen pro Pixel berechnen
   rainforest_area <- free_vegetation * fpc_rainforest
   dryforest_area <- free_vegetation * fpc_dryforest
   forest_area <- rainforest_area + dryforest_area  # Gesamter tropischer Wald
+  Grassland_area <- free_vegetation * fpc_grassland
   
 
   # Karten erstellen
@@ -53,6 +55,7 @@ local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
   percent_dryforest <- dryforest_area * 100
   percent_cft <- calc(cft_stack, sum, na.rm = TRUE) * 100  # In Prozent umwandeln
   percent_free_veg <- free_vegetation * 100
+  percent_grassland <- Grassland_area * 100
   
 
   plot(percent_dryforest, main = "Prozentuale Trockenwaldfläche")
@@ -60,4 +63,34 @@ local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
   plot(percent_rainforest, main = "Prozentuale Regenwaldfläche")
   plot(percent_cft, main = "Prozentuale Anbaufläche (CFT)")
   plot(percent_free_veg, main = "Prozentuale freie Vegetationsfläche")
+  plot(percent_grassland, main = "Prozentuale Fläche Grassland")
+  
+  
+  # 2. Alle relevanten FPC-Bänder laden
+  # Liste aller PFTs, die im Modell verwendet werden
+  pfts <- c(
+    "tropical broadleaved evergreen tree",
+    "tropical broadleaved raingreen tree",
+    "temperate needleleaved evergreen tree",
+    "temperate broadleaved evergreen tree",
+    "temperate broadleaved summergreen tree",
+    "boreal needleleaved evergreen tree",
+    "boreal broadleaved summergreen tree",
+    "boreal needleleaved summergreen tree",
+    "Tropical C4 grass",
+    "Temperate C3 grass",
+    "Polar C3 grass"
+  )
+  
+  # FPC-Datei laden
+  fpc_tropical_forest <- read_io(paste0(local_path, "Model_Output/FPC_Test/fpc.bin.json"))
+  
+  
+  # Alle FPC-Bänder zu einer Rasterebene summieren
+  fpc_sum <- Reduce(`+`, lapply(pfts, function(pft) {
+    band <- subset(fpc_tropical_forest, band = pft)
+    crop(as_raster(band), tropen_extent)
+  }))
+  
+  plot(1-fpc_sum, main = "Wüsten/Bare Soil")
   

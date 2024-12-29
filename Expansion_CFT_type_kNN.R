@@ -47,8 +47,8 @@ expansion_resampled <- resample(expansion_potential, cft_stack, method = "biline
 ### Bitte holze 15% ab -> Antwort ist Schwellenwert 30
 
 # Schwellenwert für Zabel-Index definieren (30 als Testwert, muss angepasst bzw. berechnet werden, um auf 15% Expansion zu kommen)
-threshold <- 30
-expansion_mask <- expansion_resampled > threshold  # Maske für Zielzellen
+Index <- 30
+expansion_mask <- expansion_resampled > Index  # Maske für Zielzellen
 
 plot(expansion_mask)
 

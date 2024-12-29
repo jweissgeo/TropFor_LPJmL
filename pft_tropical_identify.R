@@ -46,17 +46,21 @@ plot(vegc_trop, main = "VegC of 'Tropical C4 Grassland' [gC/m^2]")
 
 ## Entwurf 3  (FPC)
 read_meta(paste0(local_path, "Model_Output/FPC_Test/fpc.bin.json"))                    # Metadaten anzeigen
-vegc_trop = read_io(paste0(local_path, "Model_Output/FPC_Test/fpc.bin.json"))          # Datei einlesen
-vegc_trop = transform(vegc_trop, to = "lon_lat")          # räumliches
-vegc_trop = transform(vegc_trop, to = "year_month_day")   # zeitliches
+vegFPC_trop = read_io(paste0(local_path, "Model_Output/FPC_Test/fpc.bin.json"))          # Datei einlesen
+vegFPC_trop = transform(vegFPC_trop, to = "lon_lat")          # räumliches
+vegFPC_trop = transform(vegFPC_trop, to = "year_month_day")   # zeitliches
 
 #lai_trop = subset(vegc_trop, lat = as.character(seq(-23.25,23.25,0.5)))     # nur der Tropenbereich
-vegc_trop = subset(vegc_trop, year = as.character(c(2005)), band = as.character("tropical broadleaved evergreen tree"))    # nur 2006
+vegFPC_trop = subset(vegFPC_trop, year = as.character(c(2005)), band = as.character("tropical broadleaved evergreen tree"))    # nur 2006
 
-plot(vegc_trop, main = "'FPC tropical broadleaved evergreen tree'")
+plot(vegFPC_trop, main = "'FPC tropical broadleaved evergreen tree'")
 
 
 #################loca ##############################################################
 # cell_area gibt an wie viele m^2 jede Zelle (0,5°x0,5°) hat (hier zwischen 25 u. 25,5 Längengrad, da dort überall Land ist in den Tropen)
-one_meridian = subset(lai_trop,lat = as.character(seq(-23.25,23.25,0.5)), lon = as.character(25.25))
-cell_area = calc_cellarea(one_meridian)
+one_meridian = subset(vegFPC_trop,lat = as.character(seq(-23.25,23.25,0.5)), lon = as.character(25.25))
+cell_area = calc_cellarea(one_meridian, return_unit = "km2")
+
+print(cell_area)
+?calc_cellarea()
+

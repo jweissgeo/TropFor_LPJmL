@@ -50,7 +50,7 @@ forest_area <- free_vegetation * fpc_forest
 source("forest_function_advanced.R")
 
 ### Schwellenwert berechnen ###
-target_percent_loss <- 50  # Ziel-Prozentverlust
+target_percent_loss <- 15  # Ziel-Prozentverlust
 result <- find_threshold(
   target_percent_loss = target_percent_loss,
   forest_area = forest_area,
@@ -239,5 +239,61 @@ leaflet(data = df) %>%
   )
 
 
-### Letzter Schritt: Binärdatei für LPJmL so schreiben, dass dann wirklich auch nur Waldfläche in CFTs umgewandelt wird (keine Grasslands)
+### Letzter Schritt: Binärdatei für LPJmL so schreiben, dass dann wirklich auch nur Waldfläche in CFTs umgewandelt wird (keine Grasslands, oder Wüste)
+
+forest_area_expansion <- forest_area * expansion_mask
+combined_raster_CFT_FORESTEXPANSION <- stack(forest_area_expansion, combined_cft_raster)
+print(combined_raster_CFT_FORESTEXPANSION)
+
+plot(forest_area_expansion + calc(cft_stack, sum, na.rm = TRUE) * expansion_mask + (free_vegetation - forest_area) * expansion_mask)
+
+# 1. Konvertiere das kombinierte Raster in ein SpatialPointsDataFrame
+combined_raster_CFT_FORESTEXPANSION <- stack(forest_area_expansion, combined_cft_raster)
+
+# Konvertiere den Rasterstack in einen DataFrame
+df <- as.data.frame(combined_raster_CFT_FORESTEXPANSION, xy = TRUE, na.rm = TRUE)
+
+# Spaltennamen anpassen
+colnames(df) <- c("Longitude", "Latitude", "ForestChange", "CFT_Class")
+
+# Zeige die ersten Zeilen der Tabelle an
+head(df)
+
+# Optional: Gesamte Tabelle anzeigen lassen
+#View(df)
+
+
+library(scales)
+library(viridis)
+
+# 1. Werte filtern: Zeilen mit ForestChange < 0.01 entfernen
+#df <- df[df$ForestChange >= 0.2, ]
+head(df)
+View(df)
+# 2. Farbpalette für CFT-Klassen (z. B. viridis)
+cft_classes <- unique(df$CFT_Class)
+num_classes <- length(cft_classes)
+palette <- colorFactor(viridis(num_classes), domain = cft_classes)
+
+# 3. Normalisiere ForestChange für Transparenz und Farbe
+df$opacity <- rescale(df$ForestChange, to = c(0.3, 1))  # Opazität von 0.3 bis 1
+df$color <- mapply(function(cft, op) {
+  adjustcolor(palette(cft), alpha.f = op)
+}, df$CFT_Class, df$opacity)
+
+# 4. Leaflet-Karte erstellen
+leaflet(data = df) %>%
+  addTiles() %>%  # Basemap hinzufügen
+  addCircleMarkers(
+    ~Longitude, ~Latitude,  # Koordinaten
+    radius = 5,  # Punktgröße
+    color = ~color,  # Farbe mit Intensität
+    fillOpacity = ~opacity,  # Transparenz basierend auf ForestChange
+    stroke = FALSE,  # Keine Umrandung
+    popup = ~paste(
+      "<b>Koordinaten:</b>", Longitude, ", ", Latitude, "<br>",
+      "<b>ForestChange:</b>", round(ForestChange, 2), "<br>",
+      "<b>CFT_Class:</b>", CFT_Class
+    )
+  )
 
