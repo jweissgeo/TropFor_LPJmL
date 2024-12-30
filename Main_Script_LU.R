@@ -3,7 +3,7 @@ require(lpjmlkit)
 require(raster)
 require(FNN)
 library(leaflet)
-
+#
 ### local path setzen, andere immer auskommentieren ###
 #local_path <- "C:/Users/philipp/Documents/TropFor_LPJmL_LokalData/" #philipp
 local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
@@ -27,6 +27,7 @@ cft_in <- read_io(
 
 # 2. Tropenausdehnung definieren und Raster stacken
 tropen_extent <- extent(-179.75, 179.75, -23.25, 23.25)
+# Main Raster Stack
 cft_stack <- stack(lapply(1:64, function(band) {
   crop(as_raster(subset(cft_in, band = band)), tropen_extent)
 }))
@@ -96,16 +97,6 @@ train_values <- train_values[valid_train, ]
 train_coords <- train_coords[valid_train, ]
 train_classes <- train_classes[valid_train]
 
-"# Konvertiere die Daten in einen DataFrame
-result_table <- data.frame(
-  train_coords,  # Koordinaten (x, y)
-  train_classes,  # Dominierende Klasse
-  train_values  # Werte der Bänder
-)
-
-# Öffne die Tabelle in RStudio
-View(result_table)"
-
 # Erstelle eine Liste der ursprünglichen Indizes der eingeschlossenen CFTs
 original_cfts <- include_cfts  # Diese enthält die ursprünglichen Indizes der Bänder
 
@@ -117,10 +108,10 @@ result_table <- data.frame(
   train_coords,  # Koordinaten
   train_classes_original,  # Dominierende Klasse mit Originalindex
   train_values  # Werte der Bänder
-)"
+)
 
 # Tabelle anzeigen
-#View(result_table)
+View(result_table)"
 
 ### Zielzellen vorbereiten ###
 # Extrahieren der Zielzellen basierend auf der Expansion Potential-Map
@@ -150,7 +141,7 @@ for (i in 1:64) {
 
 ### Ergebnis plotten und speichern ###
 # Plot eines Beispiels
-plot(expanded_raster_stack[[4]], main = "Expansion für CFT4 - tropical cereales")
+plot(expanded_raster_stack[[3]], main = "Expansion für CFT3 - Maize")
 
 # Summe über alle Layer berechnen und plotten
 #summed_raster <- calc(expanded_raster_stack, sum, na.rm = TRUE)
@@ -161,7 +152,7 @@ area_by_cft <- sapply(1:nlayers(expanded_raster_stack), function(i) {
   sum(values(expanded_raster_stack[[i]]) == 1, na.rm = TRUE)
 })
 barplot(area_by_cft, names.arg = 1:64, 
-        main = "Gebietszuwachs für jedes CFT", 
+        main = "Pixelzuwachs für jedes CFT", 
         xlab = "CFT Index", ylab = "Anzahl Zellen", col = "lightblue")
 
 # Saven des neuen Raster-Stacks
@@ -239,8 +230,12 @@ leaflet(data = df) %>%
   )
 
 
-### Letzter Schritt: Binärdatei für LPJmL so schreiben, dass dann wirklich auch nur Waldfläche in CFTs umgewandelt wird (keine Grasslands, oder Wüste)
+### Letzter Schritt: Binärdatei für LPJmL so schreiben, dass die CFTs anteikig umgewandelt werden (CFTs erhöhen so viel wie Free Vegetation da ist) 
 
+
+
+#Dummy script
+"
 forest_area_expansion <- forest_area * expansion_mask
 combined_raster_CFT_FORESTEXPANSION <- stack(forest_area_expansion, combined_cft_raster)
 print(combined_raster_CFT_FORESTEXPANSION)
@@ -267,7 +262,7 @@ library(scales)
 library(viridis)
 
 # 1. Werte filtern: Zeilen mit ForestChange < 0.01 entfernen
-#df <- df[df$ForestChange >= 0.2, ]
+df <- df[df$ForestChange >= 0.8, ]
 head(df)
 View(df)
 # 2. Farbpalette für CFT-Klassen (z. B. viridis)
@@ -297,3 +292,4 @@ leaflet(data = df) %>%
     )
   )
 
+"
