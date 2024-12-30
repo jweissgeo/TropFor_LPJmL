@@ -5,7 +5,6 @@
 require(lpjmlkit)
 require(raster)
 require(caTools)
-require(trend)
 
 ### local path setzen, andere immer auskommentieren ###
 #local_path <- "C:/Users/philipp/Documents/TropFor_LPJmL_LokalData/" #philipp
@@ -44,7 +43,7 @@ cft_in = read_io(paste0(local_path, "gampe_baseline/cft1700_2005_irrigation_syst
 # 15. bio-energy grass
 # 16. bio-energy tree
 
-act_band = 12
+act_band = 2
 lu_in = transform(cft_in,to ="lon_lat")
 act_y = subset(lu_in, band = act_band)
 lpjml_grid = read_io(paste0(local_path, "gampe_baseline/grid.bin"))
