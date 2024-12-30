@@ -6,6 +6,8 @@ raster_stack <- stack("Klima Raster", "CFT Raster", "FPC Raster", "vegC Raster" 
 
 ###Beispiel zum Schreiben einer Funktion. Achtung Werte und Konditionen sind noch NICHT geprüft
 
+### Biomass = 2*VegC
+
 # Funktion zur Klassifikation eines Pixels
 classify_pixel <- function(values) {
   Urban <- values[1]
