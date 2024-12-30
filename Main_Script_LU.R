@@ -3,7 +3,7 @@ require(lpjmlkit)
 require(raster)
 require(FNN)
 library(leaflet)
-
+#
 ### local path setzen, andere immer auskommentieren ###
 #local_path <- "C:/Users/philipp/Documents/TropFor_LPJmL_LokalData/" #philipp
 local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
