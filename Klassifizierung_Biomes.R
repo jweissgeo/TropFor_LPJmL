@@ -425,3 +425,12 @@ legend("bottomright",
        ncol = 2)    # Anzahl der Spalten (erste 6 in einer Reihe, letzte 5 in der anderen)
 # Speichern des klassifizierten Rasters
 writeRaster(classified_raster, "classified_land_cover.tif", format = "GTiff", overwrite = TRUE)
+
+#Tropical Tree Maskieren: Werte, die unter 0.8 liegen auf 0
+tropical_tree_fraction_high <- calc(tropical_tree_fraction, fun = function(x) {
+  ifelse(x > 0.8, x, 0)  # Nur Werte über 0.8 behalten
+})
+
+# Plot der tropischen Baumfraktion > 0.8
+plot(tropical_tree_fraction_high, 
+     main = "Tropical Tree Fraction > 0.8")
