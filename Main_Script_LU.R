@@ -234,6 +234,7 @@ leaflet(data = df) %>%
 
 
 
+
 #Dummy script
 "
 forest_area_expansion <- forest_area * expansion_mask
@@ -293,3 +294,117 @@ leaflet(data = df) %>%
   )
 
 "
+
+
+
+
+##### Input für das Modell vorbereiten (.bin)
+##### Angelehnt an Skript, das wir am 5.12. im Seminar gemacht haben
+
+writeRaster(combined_cft_raster, filename = "cft_in_tropics.tif", format = "GTiff")
+raster_data = raster("cft_in_tropics.tif")
+grid_lpjml = read_io(paste0(local_path, "gampe_baseline/grid.bin.json"))
+
+# Ein langer Vektor; die X und Y Werte sollen zusammen gebracht werden; Vektor kann dann verwendet werden um nachzuschauen wo welche Zelle ist
+# Für grid und raster Koordinaten (grid und raster Auslesereihenfolge der Zellen ist unterschiedlich. Deswegen muss man über die Koordinaten vorgehen.)
+grid_coords = paste(round(grid_lpjml$data[1,,],2), round(grid_lpjml$data[,,2],2), sep = "_")           # round(...,2) --> Zwei Nachkommastellen; Erst die ersten Werte, dann die zweiten Werte
+ras_coords = paste(round(coordinates(raster_data)[,1],2), round(coordinates(raster_data)[,2],2), sep = "_")
+
+# Vektor mit gleichen Sachen und richtiger Reihenfolge
+cft_out = array(0,dim = (c(1,67420,64)))    # 1 Jahr, 67420 Zellen, 64 Bänder
+
+# convert landuse grid (In R) to format needed in LPJmL
+# R: cell - year - band
+# LPJmL: year - cell - band
+y = 1                   # man kann auch gleich 1 für y verwenden; die Zeile ist nur falls man mehrere Jahre machen möchte
+for(i in 1:67420){
+  for(b in 1:64){
+    cft_out[y,i,b] = as.numeric(cft_in$data[i,y,b])    #cft_out[year, cell, band] = als Zahl (cft_in[cell, year, band])
+    names(cft_out[y,i,b]) = names(cft_in$data[i,y,b])  # Name ändern
+  }
+}
+
+# cft_out soll an Landnutzungdfile angehangen werden
+for(i in 1:length(ras_coords)){
+  if(is.na(match(ras_coords[i], grid_coords))){        # no data Abfrage
+    next
+  }else{
+    cft_out[y, match(ras_coords[i], grid_coords), include_cfts] = raster_data[i]
+  }
+}
+
+# land use file verketten
+# use raster-year as new year (y=307)
+# Jahr öffnen, nehmen, an f.out hängen (306 Jahre)
+# es gibt 306 Jahre. Das 307te Jahr ist so wie das 306te Jahr mit dem Unterschied, dass unsere individuelle Veränderung (z.B. sugar cane in Tropen) dabei ist.
+f.out <- file("cft_intmod24_deforestation.bin", "wb")     # file erstellen und öffnen, ist so lange geöffnet bis es wieder geschlossen wird
+n_year_out = 307
+for(y in 1:n_year_out){
+  print(y)
+  if(y<n_year_out){
+    cft_in_tmp = read_io(paste0(local_path, "gampe_baseline/cft1700_2005_irrigation_systems_64bands.bin"),       # die folgenden Infos kennen wir aus dem header
+                         name = "cft1700_2005_irrigation_systems_64bands.bin",
+                         descr = "LPJLUSE",
+                         firstcell = 0, ncell = 67420,                  # es gibt 67420 Zellen auf Land
+                         firstyear = 1700, nyear = 306,
+                         scalar = 0.001, nbands = 64,
+                         datatype = 1, order = 1,                       # Datatype 1 ist integer
+                         cellsize_lat = 0.5, cellsize_lon = 0.5,
+                         nstep = 1, endian = "little",                  # endian Sortierung (kleine nach groß)
+                         subset = list(year=306))                       # year 306 ist 2005 (es geht bei 1700 los)
+    for(i in 1:67420){
+      writeBin(as.integer(round(cft_in_tmp$data[i,1,]*1000)),f.out, size = 2, endian = "little", useBytes = TRUE)      # jedes Jahr wird hier hinten dran gehangen     | [iter Wert, ein Jahr, alle Bänder]
+    }
+  }else{
+    for(i in 1:67420){
+      writeBin(as.integer(round(cft_out[1,i,]*1000)), f.out, size = 2, endian ="little", useBytes = TRUE)
+    }
+  }
+}
+
+close(f.out)         # nach dem Ausführen dieser Zeile ist die Datei erst richtig da im Ordner
+
+# write function to merge two binary files
+merge_binary_files = function(file1, file2, output_file){
+  f1 = readBin(file1, what = "raw", n = file.info(file1)$size)     # raw heißt es gibt keinen header, nur einlesen
+  f2 = readBin(file2, what = "raw", n = file.info(file2)$size)
+  out_f = c(f1, f2)       # f1 und f2 hintereinander gehangen
+  writeBin(out_f, output_file)
+}
+
+# header schreiben; der soll am Ende vor die Daten geschrieben werden, die davor erstellt wurden
+header_cft_out = create_header(
+  name = "LPJLUSE",
+  version = 2,
+  order = 1,               # order 1 ist für land use files
+  firstyear = 1700,
+  nyear = 307,             # 307 jahre insgesamt
+  firstcell = 0,
+  ncell = 67420,
+  nband = 64,
+  cellsize_lon = 0.5,
+  scalar =  0.001,         # für internes Umrechnen
+  cellsize_lat = 0.5,
+  datatype = 1,            # 1 ist integer
+  nstep = 1,               # jähricher Zeitschritt
+  endian = "little",
+  verbose = TRUE
+)
+
+write_header(filename ="landuse_header.bin", header = header_cft_out, overwrite = TRUE)
+merge_binary_files("landuse_header.bin", "cft_intmod24_deforestation.bin", "cft_intmod24_deforestation_final.bin")
+
+header_cft_new = read_header("cft_intmod24_deforestation_final.bin")
+
+cft_new = read_io("cft_intmod24_deforestation_final.bin",
+                  name = "cft_intmod24_deforestation_final.bin",
+                  descr = "LPJLUSE",
+                  firstcell = 0, ncell = 67420,                  # es gibt 67420 Zellen auf Land
+                  firstyear = 1700, nyear = 307,
+                  scalar = 0.001, nbands = 64,
+                  datatype = 1, order = 1,                       # Datatype 1 ist integer
+                  cellsize_lat = 0.5, cellsize_lon = 0.5,
+                  nstep = 1, endian = "little",                  # endian Sortierung (kleine nach groß)
+                  subset = list(year=307))                       # year 307 ist 2006 (erstes Jahr mit modifikation)
+
+plot(subset(cft_new))
