@@ -47,22 +47,33 @@ fpc_forest <- crop(as_raster(subset(fpc_tropical_forest, band = "tropical broadl
   crop(as_raster(subset(fpc_tropical_forest, band = "tropical broadleaved raingreen tree")), tropen_extent)
 forest_area <- free_vegetation * fpc_forest
 
-### Funktion laden ###
+## Funktion laden
 source("forest_function_advanced.R")
 
-### Schwellenwert berechnen ###
-target_percent_loss <- 15  # Ziel-Prozentverlust
+# Ziel-Prozentverlust definieren
+target_percent_loss <- 15
+
+# Maske für Waldflächen mit Werten > 0.8 erstellen
+forest_mask <- forest_area > 0.8
+plot(forest_mask)
+forest_area_filtered <- forest_area * forest_mask
+plot(forest_area_filtered)
+
+# Schwellenwert berechnen
 result <- find_threshold(
   target_percent_loss = target_percent_loss,
-  forest_area = forest_area,
+  forest_area = forest_area_filtered,  # Gefilterte Waldflächen übergeben
   expansion_resampled = expansion_resampled
 )
+
+# Ergebnis ausgeben
+print(result)
 
 ### Ergebnisse ausgeben ###
 print(paste("Schwellenwert des Index für ", target_percent_loss, "% Verlust: ", round(result$index, 2)))
 
 calculated_index <- result$index  # Der berechnete Schwellenwert
-expansion_mask <- expansion_resampled > calculated_index  # Maske basierend auf dem Index
+expansion_mask <- (expansion_resampled > calculated_index) & forest_mask  # Maske basierend auf dem Index
 
 ### Plot der Expansion Mask ###
 plot(expansion_mask, main = paste("Expansion Mask mit Index", round(calculated_index, 2), ", bei Waldverlust", target_percent_loss, "%"))
@@ -70,6 +81,56 @@ plot(expansion_mask, main = paste("Expansion Mask mit Index", round(calculated_i
 # zum Vergleich
 percent_forest <- forest_area * 100  # In Prozent umwandeln
 plot(percent_forest, main = "Prozentuale Gesamtwaldfläche")
+
+##calc area
+calc_total_area <- function(area_raster) {
+  coords <- coordinates(area_raster)
+  cell_areas <- calc_cellarea(coords[, 2], return_unit = "km2")
+  total_area <- sum(values(area_raster) * cell_areas, na.rm = TRUE)
+  return(total_area)
+}
+
+# Gesamtfläche vor der Maskierung (in km²)
+total_forest_area_km2 <- calc_total_area(forest_area * forest_mask)
+
+# Gesamtfläche der entfernten Waldflächen (in km²)
+removed_area_km2 <- calc_total_area(forest_area * forest_mask * expansion_mask)
+
+# Prozentualer Verlust
+percent_loss <- (removed_area_km2 / total_forest_area_km2) * 100
+
+# Ergebnisse anzeigen
+cat("Gesamtwaldfläche: ", total_forest_area_km2, "km²\n")
+cat("Entfernte Waldfläche: ", removed_area_km2, "km²\n")
+cat("Prozentualer Verlust: ", percent_loss, "%\n")
+
+# Karte erstellen: Gesamtwaldfläche und rote Pixel für Abholzung
+
+library(RColorBrewer)
+# Basiswaldkarte
+forest_map <- forest_area * forest_mask
+
+# Abholzungskarte (nur relevante Pixel behalten)
+deforestation_map <- forest_area * forest_mask * expansion_mask
+
+# Hintergrund- und Null-Werte in der Abholzungskarte entfernen
+deforestation_map[deforestation_map == 0] <- NA
+
+# Anpassung der Farbpalette für die Waldkarte
+# Basierend auf 'Greens' von RColorBrewer, aber erweitert
+forest_colors <- c("lightgray", brewer.pal(9, "Greens"))
+
+# Plot der Gesamtwaldfläche
+plot(forest_map, 
+     col = forest_colors, 
+     main = "Gesamtwaldfläche mit Abholzung", 
+     legend = TRUE)
+
+# Hinzufügen der Abholzungspixel (nur relevante Pixel rot zeichnen)
+plot(deforestation_map, 
+     col = "red", 
+     add = TRUE, 
+     legend = FALSE)
 
 ### Trainingsdaten für k- nearest neighbour vorbereiten ###
 # Indizes der auszuschließenden und eingeschlossenen CFTs
@@ -188,16 +249,32 @@ cft_colors <- c(
 # Überprüfe die Werte im Raster
 unique_values <- sort(unique(values(combined_cft_raster)))  # Eindeutige Werte im Raster (z. B. 1-13)
 
-# Plotten der kombinierten Karte
+
+###Plot der CFT-Karte mit grauem hintergrund
+# Plot der Waldkarte als Hintergrund (geht vlt)
 plot(
-  combined_cft_raster, col = cft_colors[unique_values], legend = FALSE,
+  forest_map, 
+  col = c("lightgray"), 
+  legend = FALSE,
   main = "CFT Expansion der Klassen 1-12 und 18"
+)
+
+# Hinzufügen der kombinierten CFT-Karte
+plot(
+  combined_cft_raster, 
+  col = cft_colors[unique_values], 
+  legend = FALSE, 
+  add = TRUE
 )
 
 # Hinzufügen der Legende (nur für vorhandene Klassen)
 legend(
-  "topright", legend = cft_names[unique_values], fill = cft_colors[unique_values], 
-  title = "CFT Klassen", cex = 0.6, bty = "n"
+  "topright", 
+  legend = cft_names[unique_values], 
+  fill = cft_colors[unique_values], 
+  title = "CFT Klassen", 
+  cex = 0.6, 
+  bty = "n"
 )
 
 #### Leaflet Karte zum überprüfen
@@ -230,70 +307,6 @@ leaflet(data = df) %>%
   )
 
 
-### Letzter Schritt: Binärdatei für LPJmL so schreiben, dass die CFTs anteikig umgewandelt werden (CFTs erhöhen so viel wie Free Vegetation da ist) 
-
-
-
-
-#Dummy script
-"
-forest_area_expansion <- forest_area * expansion_mask
-combined_raster_CFT_FORESTEXPANSION <- stack(forest_area_expansion, combined_cft_raster)
-print(combined_raster_CFT_FORESTEXPANSION)
-
-plot(forest_area_expansion + calc(cft_stack, sum, na.rm = TRUE) * expansion_mask + (free_vegetation - forest_area) * expansion_mask)
-
-# 1. Konvertiere das kombinierte Raster in ein SpatialPointsDataFrame
-combined_raster_CFT_FORESTEXPANSION <- stack(forest_area_expansion, combined_cft_raster)
-
-# Konvertiere den Rasterstack in einen DataFrame
-df <- as.data.frame(combined_raster_CFT_FORESTEXPANSION, xy = TRUE, na.rm = TRUE)
-
-# Spaltennamen anpassen
-colnames(df) <- c("Longitude", "Latitude", "ForestChange", "CFT_Class")
-
-# Zeige die ersten Zeilen der Tabelle an
-head(df)
-
-# Optional: Gesamte Tabelle anzeigen lassen
-#View(df)
-
-
-library(scales)
-library(viridis)
-
-# 1. Werte filtern: Zeilen mit ForestChange < 0.01 entfernen
-df <- df[df$ForestChange >= 0.8, ]
-head(df)
-View(df)
-# 2. Farbpalette für CFT-Klassen (z. B. viridis)
-cft_classes <- unique(df$CFT_Class)
-num_classes <- length(cft_classes)
-palette <- colorFactor(viridis(num_classes), domain = cft_classes)
-
-# 3. Normalisiere ForestChange für Transparenz und Farbe
-df$opacity <- rescale(df$ForestChange, to = c(0.3, 1))  # Opazität von 0.3 bis 1
-df$color <- mapply(function(cft, op) {
-  adjustcolor(palette(cft), alpha.f = op)
-}, df$CFT_Class, df$opacity)
-
-# 4. Leaflet-Karte erstellen
-leaflet(data = df) %>%
-  addTiles() %>%  # Basemap hinzufügen
-  addCircleMarkers(
-    ~Longitude, ~Latitude,  # Koordinaten
-    radius = 5,  # Punktgröße
-    color = ~color,  # Farbe mit Intensität
-    fillOpacity = ~opacity,  # Transparenz basierend auf ForestChange
-    stroke = FALSE,  # Keine Umrandung
-    popup = ~paste(
-      "<b>Koordinaten:</b>", Longitude, ", ", Latitude, "<br>",
-      "<b>ForestChange:</b>", round(ForestChange, 2), "<br>",
-      "<b>CFT_Class:</b>", CFT_Class
-    )
-  )
-
-"
 
 
 
@@ -301,7 +314,7 @@ leaflet(data = df) %>%
 ##### Input für das Modell vorbereiten (.bin)
 ##### Angelehnt an Skript, das wir am 5.12. im Seminar gemacht haben
 
-writeRaster(combined_cft_raster, filename = "cft_in_tropics.tif", format = "GTiff")
+writeRaster(combined_cft_raster, filename = "cft_in_tropics.tif", format = "GTiff", overwrite = TRUE)
 raster_data = raster("cft_in_tropics.tif")
 grid_lpjml = read_io(paste0(local_path, "gampe_baseline/grid.bin.json"))
 
