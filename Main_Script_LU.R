@@ -149,7 +149,7 @@ train_coords <- train_coords[valid_train, ]
 # Definieren der dominierenden CFT-Klasse (mit Schwellenwert, um unrealistische Ergebnisse zu verhindern; nur jetzt schon hochskalierte Crops)
 train_classes <- apply(train_values, 1, function(row) {
   max_val <- max(row, na.rm = TRUE)
-  if (max_val >= 0.15) which.max(row) else NA #Schwellenwert 0.15
+  if (max_val >= 0.01) which.max(row) else NA #Schwellenwert 0.01
 })
 
 # Entfernen von Zellen ohne gültige dominierende Klasse
@@ -221,7 +221,9 @@ writeRaster(expanded_raster_stack,
             filename = "Expansion_Potential/expanded_cropland_stack_simple.tif",
             format = "GTiff", overwrite = TRUE) #Achtung!!!!!
 
-### Karte zur Darstellung ###
+### Karte zur Darstellung ### # die ist aktuell noch nicht richtig, die Leaflet Karte schon!
+#Das Ergebnis ist auch richtig
+
 # Kombinieren der Raster der Klassen 1-12 und Klasse 18
 cft_expansion <- subset(expanded_raster_stack, c(1:12, 18))
 
