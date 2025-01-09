@@ -340,11 +340,14 @@ for(i in 1:67420){
 }
 
 # cft_out soll an Landnutzungdfile angehangen werden
-for(i in 1:length(ras_coords)){
-  if(is.na(match(ras_coords[i], grid_coords))){        # no data Abfrage
-    next
-  }else{
-    cft_out[y, match(ras_coords[i], grid_coords), include_cfts] = raster_data[i]
+sequence = c(1:12, 18)                                   # die Bänder verwenden wir
+for(band in sequence){
+  for(i in 1:length(ras_coords)){
+    if(is.na(match(ras_coords[i], grid_coords))){        # no data Abfrage
+      next
+    }else{
+      cft_out[y, match(ras_coords[i], grid_coords), band] = cft_expansion[[band]][i]       # cft_expansion sind 13 Bänder übereinander
+    }
   }
 }
 
