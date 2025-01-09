@@ -267,7 +267,7 @@ total_fpc <- tropical_tree_fraction + fpc_temperate_trees + fpc_boreal_trees + f
 
 
 # Tropische Baumfraktion
-tropical_tree_fraction <- free_vegetation * fpc_forest
+tropical_tree_fraction <- free_vegetation * fpc_tropforest
 
 # Temperate Baumfraktion
 temperate_tree_fraction <- free_vegetation * fpc_temperate_trees
@@ -410,7 +410,7 @@ land_cover_classes <- c(
 )
 
 # Plot der Karte ohne Skala (kein raster::plot-Farbbalken)
-plot(classified_raster_tropen, 
+plot(classified_raster, 
      col = land_cover_colors, 
      main = "Classified Land Cover in the Tropics",
      legend = FALSE)  # Keine Skala anzeigen
