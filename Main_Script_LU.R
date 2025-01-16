@@ -5,8 +5,8 @@ require(FNN)
 library(leaflet)
 #
 ### local path setzen, andere immer auskommentieren ###
-#local_path <- "C:/Users/philipp/Documents/TropFor_LPJmL_LokalData/" #philipp
-local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
+local_path <- "C:/Users/philipp/Documents/TropFor_LPJmL_LokalData/" #philipp
+#local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
 #local_path <- "C:/Dokumente/Umweltsysteme/integrierte_modellierung/"  # Mareike
 
 
@@ -221,17 +221,10 @@ writeRaster(expanded_raster_stack,
             filename = "Expansion_Potential/expanded_cropland_stack_simple.tif",
             format = "GTiff", overwrite = TRUE) #Achtung!!!!!
 
-### Karte zur Darstellung ### # die ist aktuell noch nicht richtig, die Leaflet Karte schon!
-#Das Ergebnis ist auch richtig
-
-# Kombinieren der Raster der Klassen 1-12 und Klasse 18
+### Karte zur Darstellung ###
 cft_expansion <- subset(expanded_raster_stack, c(1:12, 18))
-
-# Zusammenfügen der Klassen (jede Zelle wird der höchsten Klasse zugeordnet)
 combined_cft_raster <- which.max(cft_expansion)
 
-### Definition der Legende ###
-# Namen der CFT-Klassen (1-12 und 18)
 cft_names <- c(
   "Temperate Cereals", "Rice", "Maize", "Tropical Cereals",
   "Pulses", "Temperate Roots", "Tropical Roots",
@@ -240,20 +233,24 @@ cft_names <- c(
   "Rice (Surface Watering)"
 )
 
-# Farben für die CFT-Klassen (1-12 und 18)
 cft_colors <- c(
-  "#1f78b4", "#33a02c", "#e31a1c", "#ff7f00",
-  "#6a3d9a", "#b15928", "#a6cee3", "#b2df8a",
-  "#fb9a99", "#fdbf6f", "#cab2d6", "#ffff99",
-  "#41ab5d"  # Farbe für "Rice (Surface Watering)"
+  "Temperate Cereals" = "#1f78b4",
+  "Rice" = "#33a02c",
+  "Maize" = "#e31a1c",
+  "Tropical Cereals" = "#ff7f00",
+  "Pulses" = "#6a3d9a",
+  "Temperate Roots" = "#b15928",
+  "Tropical Roots" = "#a6cee3",
+  "Oil Crops Sunflower" = "#b2df8a",
+  "Oil Crops Soybean" = "#fb9a99",
+  "Oil Crops Groundnut" = "#fdbf6f",
+  "Oil Crops Rapeseed" = "#cab2d6",
+  "Sugar Cane" = "#ffff99",
+  "Rice (Surface Watering)" = "#41ab5d"
 )
 
-# Überprüfe die Werte im Raster
-unique_values <- sort(unique(values(combined_cft_raster)))  # Eindeutige Werte im Raster (z. B. 1-13)
+unique_values <- sort(unique(values(combined_cft_raster)))
 
-
-###Plot der CFT-Karte mit grauem hintergrund
-# Plot der Waldkarte als Hintergrund (geht vlt)
 plot(
   forest_map, 
   col = c("lightgray"), 
@@ -261,62 +258,281 @@ plot(
   main = "CFT Expansion der Klassen 1-12 und 18"
 )
 
-# Hinzufügen der kombinierten CFT-Karte
 plot(
   combined_cft_raster, 
-  col = cft_colors[unique_values], 
+  col = unname(cft_colors[cft_names[unique_values]]), 
   legend = FALSE, 
   add = TRUE
 )
 
-# Hinzufügen der Legende (nur für vorhandene Klassen)
 legend(
   "topright", 
   legend = cft_names[unique_values], 
-  fill = cft_colors[unique_values], 
+  fill = unname(cft_colors[cft_names[unique_values]]), 
   title = "CFT Klassen", 
   cex = 0.6, 
   bty = "n"
 )
 
-#### Leaflet Karte zum überprüfen
-
-
-### Konvertiere das kombinierte Raster in ein SpatialPointsDataFrame
+### Leaflet Karte ###
 spdf <- as(combined_cft_raster, "SpatialPointsDataFrame")
-
-### Füge die Daten in ein DataFrame
 df <- as.data.frame(spdf)
-df$x <- coordinates(spdf)[, 1]  # x-Koordinaten (Longitude)
-df$y <- coordinates(spdf)[, 2]  # y-Koordinaten (Latitude)
+df$x <- coordinates(spdf)[, 1]
+df$y <- coordinates(spdf)[, 2]
 
-# Farben basierend auf der CFT-Klasse zuweisen
-df$color <- cft_colors[df$layer]  # Farbe basierend auf der dominierenden Klasse
+# Ändere Layer 13 zu 18
+df$layer[df$layer == 13] <- 18
 
-### Erstelle eine interaktive Leaflet-Karte
+# Werte aus free_vegetation hinzufügen, wenn Koordinaten übereinstimmen
+df$free_vegetation <- NA
+free_vegetation_coords <- coordinates(free_vegetation)
+free_vegetation_values <- values(free_vegetation)
+
+for (i in 1:nrow(df)) {
+  match_idx <- which(free_vegetation_coords[, 1] == df$x[i] & free_vegetation_coords[, 2] == df$y[i])
+  if (length(match_idx) > 0) {
+    df$free_vegetation[i] <- free_vegetation_values[match_idx]
+  }
+}
+
+# Explizite Zuweisung der Layerwerte zu Klassen und Farben
+df$class <- sapply(df$layer, function(layer) {
+  if (layer == 1) return("Temperate Cereals")
+  if (layer == 2) return("Rice")
+  if (layer == 3) return("Maize")
+  if (layer == 4) return("Tropical Cereals")
+  if (layer == 5) return("Pulses")
+  if (layer == 6) return("Temperate Roots")
+  if (layer == 7) return("Tropical Roots")
+  if (layer == 8) return("Oil Crops Sunflower")
+  if (layer == 9) return("Oil Crops Soybean")
+  if (layer == 10) return("Oil Crops Groundnut")
+  if (layer == 11) return("Oil Crops Rapeseed")
+  if (layer == 12) return("Sugar Cane")
+  if (layer == 18) return("Rice (Surface Watering)")
+  return(NA)
+})
+
+df$color <- sapply(df$class, function(class) {
+  cft_colors[class]
+})
+
 leaflet(data = df) %>%
-  addTiles() %>%  # Basemap hinzufügen
+  addTiles() %>%
   addCircleMarkers(
-    ~x, ~y,  # Koordinaten
-    radius = 2,  # Größe der Punkte
-    color = ~color,  # Farbe basierend auf der Klasse
-    stroke = FALSE,  # Keine Umrandung
+    ~x, ~y,
+    radius = 2,
+    color = ~color,
+    stroke = FALSE,
     fillOpacity = 0.7,
     popup = ~paste(
       "<b>Koordinaten:</b>", x, y, "<br>",
-      "<b>Dominierende Klasse:</b>", cft_names[df$layer]
+      "<b>Dominierende Klasse:</b>", class, "<br>",
+      "<b>Freie Vegetation:</b>", round(free_vegetation, 2)
     )
   )
 
 
+# Koordinaten extrahieren
+coords1 <- coordinates(free_vegetation)
+
+# Zellflächen berechnen
+cell_areas_freevegetation <- calc_cellarea(coords1[, 2], return_unit = "km2")
+
+plot(cell_areas_freevegetation)
+
+# Erstellung der Tabelle mit Koordinaten und Zellflächen
+table_with_coords <- data.frame(
+  lon = coords1[, 1],
+  lat = coords1[, 2],
+  cell_area_km2 = cell_areas_freevegetation
+)
+
+# Ausgabe der Tabelle
+head(table_with_coords)
+View(table_with_coords)
+
+library(dplyr)
+
+# Join von table_with_coords und df anhand der Koordinaten
+df <- df %>%
+  left_join(
+    table_with_coords,
+    by = c("x" = "lon", "y" = "lat")
+  )
+
+# Überprüfen, ob der Join erfolgreich war
+head(df)
+summary(df$cell_area_km2)  # Sicherstellen, dass die Zellflächen korrekt integriert wurden
 
 
 
+
+df$areacrop <- ifelse(!is.na(df$free_vegetation) & df$free_vegetation > 0,
+                      df$cell_area_km2 * df$free_vegetation,
+                      NA)
+library(dplyr)
+library(ggplot2)
+library(scales) # Für die Formatierung der Achsen
+
+View(df)
+# Gruppieren nach "class" und Summieren der crop_area
+area_by_class <- df %>%
+  group_by(class) %>%
+  summarise(total_crop_area = sum(areacrop, na.rm = TRUE)) %>%  # Keine Umrechnung, da bereits in km²
+  arrange(desc(total_crop_area))
+
+# Plot mit ggplot2
+ggplot(area_by_class, aes(x = reorder(class, -total_crop_area), y = total_crop_area, fill = class)) +
+  geom_bar(stat = "identity", show.legend = TRUE) +
+  scale_fill_manual(values = cft_colors) +
+  scale_y_continuous(
+    labels = comma_format() # Y-Achsen-Werte vollständig und mit Kommas anzeigen
+  ) +
+  labs(
+    title = "Summierte Crop Area nach Klasse",
+    x = "Klasse",
+    y = "Gesamte Crop Area (km²)", # Korrekte Einheit direkt angegeben
+    fill = "Kulturarten (CFT)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12),
+    plot.title = element_text(size = 14, face = "bold"),
+    legend.position = "bottom"
+  )
+
+library(raster)
+
+# Main Raster Stack
+cft_stack_world <- stack(lapply(1:64, function(band) {
+  as_raster(subset(cft_in, band = band))
+}))
+
+
+# Dummy-Stack mit 64 leeren Layern erstellen
+dummy_stack <- stack()  # Leeren Stack initialisieren
+for (i in 1:64) {
+  # Leeren Raster mit Struktur von cft_stack erstellen und initialisieren
+  empty_raster <- raster(extent(cft_stack_world), res = res(cft_stack_world), crs = crs(cft_stack_world))
+  values(empty_raster) <- NA  # Fülle Raster mit NA-Werten
+  dummy_stack <- addLayer(dummy_stack, empty_raster)  # Raster zum Stack
+}
+
+# Sicherstellen, dass der Dummy-Stack 64 Bänder hat
+if (nlayers(dummy_stack) == 64) {
+  cat("Der Dummy-Stack wurde korrekt mit 64 Bändern erstellt.\n")
+} else {
+  stop(paste("Fehler: Der Dummy-Stack hat nur", nlayers(dummy_stack), "Bänder."))
+}
+
+
+dim(dummy_stack)
+dim(cft_stack_world)
+# Daten aus df vorbereiten und in den Dummy-Stack laden
+# Annahme: df enthält Spalten "x", "y", "free_vegetation", "class"
+# Daten aus df in den Dummy-Stack laden
+# Daten aus df in den Dummy-Stack laden
+for (layer_index in 1:64) {
+  # Filtere Daten für das aktuelle Layer
+  layer_data <- df[df$layer == layer_index, ]
+  
+  # Nur fortfahren, wenn es Daten für dieses Layer gibt
+  if (nrow(layer_data) > 0) {
+    # Koordinaten und Werte vorbereiten
+    coordinates_layer <- cbind(layer_data$x, layer_data$y)  # Koordinaten (x, y)
+    values_layer <- layer_data$free_vegetation              # Werte für das Layer
+    
+    # Raster für das aktuelle Layer aktualisieren
+    dummy_stack[[layer_index]] <- rasterize(
+      coordinates_layer, 
+      dummy_stack[[layer_index]], 
+      field = values_layer,  # Feld mit Werten
+      background = NA        # Hintergrund bleibt NA
+    )
+  }
+}
+
+# Überprüfung: Beispiel-Plot eines Layers im Dummy-Stack
+plot(dummy_stack[[3]], main = "Layer 3 (Maize) im Dummy-Stack")
+
+# Sicherstellen, dass der Dummy-Stack korrekt gefüllt wurde
+for (i in 1:64) {
+  if (hasValues(dummy_stack[[i]])) {
+    cat("Layer", i, "enthält Daten.\n")
+  } else {
+    cat("Layer", i, "ist leer.\n")
+  }
+}
+
+# Schleife über alle Layer
+for (layer_index in 1:64) {
+  # Debugging-Ausgabe zur Kontrolle des aktuellen Layers
+  cat("Verarbeite Layer", layer_index, "\n")
+  
+  # Hole Werte aus dem aktuellen Layer von cft_stack_world und dummy_stack
+  cft_values <- values(cft_stack_world[[layer_index]])
+  dummy_values <- values(dummy_stack[[layer_index]])
+  
+  # Debugging-Ausgabe: Zeige NA-Werte im Dummy-Stack
+  cat("Anzahl gültiger Werte im Dummy-Layer:", sum(!is.na(dummy_values)), "\n")
+  
+  # Addiere nur, wenn dummy_values gültige Werte enthält
+  updated_values <- ifelse(is.na(dummy_values), cft_values, cft_values + dummy_values)
+  
+  # Aktualisiere die Werte im cft_stack_world
+  values(cft_stack_world[[layer_index]]) <- updated_values
+}
+
+cat("Alle Layer wurden erfolgreich aktualisiert.\n")
+
+View(cft_stack_world[[3]])
+
+
+
+
+
+# Tabelle anzeigen
+View(layer_table)  # Öffnet die Tabelle im Viewer
+
+cft_stack_world_bs <- stack(lapply(1:64, function(band) {
+  as_raster(subset(cft_in, band = band))
+}))
+
+
+
+free_vegetation_exttrop <- 1 - calc(cft_stack_world_bs, sum, na.rm = TRUE)
+# Zellflächen berechnen
+cell_areas_freevegetation_exttrop <- calc_cellarea(coords2[, 2], return_unit = "km2")
+
+
+# Koordinaten extrahieren
+coords2 <- coordinates(free_vegetation_exttrop)
+
+layer_table <- as.data.frame(cft_stack_world[[12]], xy = TRUE, na.rm = FALSE)
+
+layer_table2 <- as.data.frame(cft_stack_world_bs[[12]], xy = TRUE, na.rm = FALSE)
+
+View(layer_table2)
+
+
+
+layer_table2$flaeche_cane <- cell_areas_freevegetation_exttrop * layer_table2$cft1700_2005_irrigation_systems_64bands.bin.12
+  
+
+layer_table$flaeche_cane <- cell_areas_freevegetation_exttrop * layer_table$cft1700_2005_irrigation_systems_64bands.bin.12
+
+print(sum(layer_table$flaeche_cane, na.rm = TRUE) - sum(layer_table2$flaeche_cane, na.rm = TRUE))
+
+plot(cft_stack_world_bs[[2]])
+plot(cft_stack_world[[2]])
 
 ##### Input für das Modell vorbereiten (.bin)
 ##### Angelehnt an Skript, das wir am 5.12. im Seminar gemacht haben
 
-writeRaster(combined_cft_raster, filename = "cft_in_tropics.tif", format = "GTiff", overwrite = TRUE)
+writeRaster(cft_stack_world, filename = "cft_in_tropics.tif", format = "GTiff", overwrite = TRUE)
 raster_data = raster("cft_in_tropics.tif")
 grid_lpjml = read_io(paste0(local_path, "gampe_baseline/grid.bin.json"))
 
@@ -340,7 +556,7 @@ for(i in 1:67420){
 }
 
 # cft_out soll an Landnutzungdfile angehangen werden
-sequence = c(1:12, 18)                                   # die Bänder verwenden wir
+sequence = c(1:64)                                   # die Bänder verwenden wir
 for(band in sequence){
   for(i in 1:length(ras_coords)){
     if(is.na(match(ras_coords[i], grid_coords))){        # no data Abfrage
