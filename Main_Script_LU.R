@@ -574,25 +574,6 @@ for(band in sequence){
   }
 }
 
-# Debug-Schleife mit Fortschrittsanzeige
-sequence = c(1:64)  # Die Bänder verwenden wir
-
-for (band in sequence) {
-  cat("Verarbeite Band:", band, "\n")  # Anzeige des aktuellen Bands
-  for (i in 1:length(ras_coords)) {
-    if (is.na(match(ras_coords[i], grid_coords))) {  # No-Data-Abfrage
-      next
-    } else {
-      # Werte zuweisen
-      cft_out[y, match(ras_coords[i], grid_coords), band] <- raster_data[[band]][i]
-    }
-    # Debug-Ausgabe des Fortschritts innerhalb des Bands
-    if (i %% 1000 == 0) {  # Fortschrittsanzeige alle 1000 Schritte
-      cat("  Band", band, "- Zelle:", i, "von", length(ras_coords), "\n")
-    }
-  }
-}
-
 head(cft_out)
 
 # land use file verketten
