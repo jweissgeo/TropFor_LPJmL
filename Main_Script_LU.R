@@ -533,48 +533,132 @@ plot(cft_stack_world_bs[[2]])
 plot(cft_stack_world[[15]])
 
 
-
 ##### Input für das Modell vorbereiten (.bin)
 ##### Angelehnt an Skript, das wir am 5.12. im Seminar gemacht haben
 
-writeRaster(cft_stack_world, filename = "cft_in_tropics.tif", format = "GTiff", overwrite = TRUE)
+#writeRaster(cft_stack_world, filename = "cft_in_tropics.tif", format = "GTiff", overwrite = FALSE)
 raster_data = stack("cft_in_tropics.tif")
-raster_data
+
 grid_lpjml = read_io(paste0(local_path, "gampe_baseline/grid.bin.json"))
-View(raster_data)
+
+# Extrahiere die Werte für jedes Band
+data_band1 <- grid_lpjml$data[, 1, 1]  # Werte aus Band 1
+data_band2 <- grid_lpjml$data[, 1, 2]  # Werte aus Band 2
+dims <- dim(grid_lpjml$data)
+# Kombiniere die Bänder und formatiere sie als Tabelle
+data_table <- data.frame(
+  cell = 1:dims[1],                    # Cell-Index
+  band1 = round(data_band1, 2),        # Band 1-Werte
+  band2 = round(data_band2, 2),        # Band 2-Werte
+  x_y = paste(round(data_band1, 2), round(data_band2, 2), sep = "_")  # Kombinierte x_y-Spalte
+)
+View(data_table)
+
+# Rasterwerte als Matrix extrahieren
+raster_matrix <- as.data.frame(getValues(raster_data))
+
+# Namen der Bänder setzen (optional, falls nicht vorhanden)
+names(raster_matrix) <- paste0("Band_", 1:nlayers(raster_data))
+
+# Koordinaten extrahieren
+coords_ras <- coordinates(raster_data)
+
+# Koordinaten zu den Rasterwerten hinzufügen
+raster_matrix_with_coords <- cbind(coords_ras, raster_matrix)
+
+# Kombinierte x_y-Spalte erstellen
+raster_matrix_with_coords$x_y <- apply(coords_ras, 1, function(row) paste(row[1], row[2], sep = "_"))
+
+# `x_y`-Spalte an die dritte Position verschieben
+raster_matrix_with_coords <- raster_matrix_with_coords[, c(1, 2, ncol(raster_matrix_with_coords), 3:(ncol(raster_matrix_with_coords) - 1))]
+
+raster_matrix_with_coords <- raster_matrix_with_coords[, -c(1, 2)] #löscht die unnötigen spalten
 
 
-# Ein langer Vektor; die X und Y Werte sollen zusammen gebracht werden; Vektor kann dann verwendet werden um nachzuschauen wo welche Zelle ist
-# Für grid und raster Koordinaten (grid und raster Auslesereihenfolge der Zellen ist unterschiedlich. Deswegen muss man über die Koordinaten vorgehen.)
-grid_coords = paste(round(grid_lpjml$data[1,,],2), round(grid_lpjml$data[,,2],2), sep = "_")           # round(...,2) --> Zwei Nachkommastellen; Erst die ersten Werte, dann die zweiten Werte
-ras_coords = paste(round(coordinates(raster_data)[,1],2), round(coordinates(raster_data)[,2],2), sep = "_")
+View(raster_matrix_with_coords)
 
-# Vektor mit gleichen Sachen und richtiger Reihenfolge
-cft_out = array(0,dim = (c(1,67420,64)))    # 1 Jahr, 67420 Zellen, 64 Bänder
-# convert landuse grid (In R) to format needed in LPJmL
-# R: cell - year - band
-# LPJmL: year - cell - band
-y = 1                   # man kann auch gleich 1 für y verwenden; die Zeile ist nur falls man mehrere Jahre machen möchte
-for(i in 1:67420){
-  for(b in 1:64){
-    cft_out[y,i,b] = as.numeric(cft_in$data[i,y,b])    #cft_out[year, cell, band] = als Zahl (cft_in[cell, year, band])
-    names(cft_out[y,i,b]) = names(cft_in$data[i,y,b])  # Name ändern
-  }
+
+# `data_table$x_y` in eine Tabelle umwandeln, da `inner_join` nur mit DataFrames funktioniert
+data_table_for_join <- data_table %>% select(x_y)
+
+# Inner Join zwischen raster_matrix_with_coords und data_table_for_join
+filtered_raster <- raster_matrix_with_coords %>%
+  inner_join(data_table_for_join, by = "x_y")
+
+# Ergebnis anzeigen
+View(filtered_raster)
+
+
+# Optional: Überprüfen der Anzahl übereinstimmender Zeilen
+cat("Anzahl übereinstimmender Zeilen:", nrow(filtered_raster), "\n")
+
+
+# Dimensionen prüfen
+dims <- dim(grid_lpjml$data)
+print(dims)  # Erwartet: c(67420, 1, 2)
+
+# Extrahiere die x- und y-Koordinaten aus den ersten beiden Bändern
+x_coords <- round(grid_lpjml$data[, 1, 1], 2)  # Band 1 enthält x-Koordinaten
+y_coords <- round(grid_lpjml$data[, 1, 2], 2)  # Band 2 enthält y-Koordinaten
+
+# Kombiniere x- und y-Koordinaten zu `grid_coords`
+grid_coords <- paste(x_coords, y_coords, sep = "_")
+
+# Erstelle eine Tabelle mit den Koordinaten
+grid_coords_table <- data.frame(
+  cell = 1:dims[1],         # Zellindex
+  x = x_coords,             # x-Koordinaten
+  y = y_coords,             # y-Koordinaten
+  x_y = grid_coords         # Kombinierte Koordinaten
+)
+
+# Tabelle anzeigen
+View(grid_coords_table)
+
+# Optional: Tabelle exportieren
+#write.csv(grid_coords_table, "grid_coords_table.csv", row.names = FALSE)
+
+# Überprüfung: Reihenfolge von cft_out mit grid_coords
+test_coords <- paste(grid_lpjml$data[, 1, 1], grid_lpjml$data[, 1, 2], sep = "_")
+result_coords <- grid_coords
+
+# Reihenfolge prüfen
+identical(test_coords, result_coords)  # TRUE bedeutet korrekte Reihenfolge
+
+
+###
+# Dimensionen definieren
+n_cells <- nrow(filtered_raster)
+n_bands <- 64
+n_years <- 1
+
+# Leeres Array erstellen
+cft_out <- array(0, dim = c(n_years, n_cells, n_bands))
+
+# Originale Reihenfolge von lpjml_grid sicherstellen
+sorted_raster <- filtered_raster[match(grid_coords, filtered_raster$x_y, nomatch = 0), ]
+
+
+# Befüllen des Arrays
+for (band in 1:n_bands) {
+  cft_out[1, , band] <- sorted_raster[[paste0("Band_", band)]]
 }
+
 View(cft_out)
-# raster stack soll an Landnutzungdfile angehangen werden
-sequence = c(1:64)                                   # die Bänder verwenden wir
-for(band in sequence){
-  for(i in 1:length(ras_coords)){
-    if(is.na(match(ras_coords[i], grid_coords))){        # no data Abfrage
-      next
-    }else{
-      cft_out[y, match(ras_coords[i], grid_coords), band] = raster_data[[band]][i]       # cft_expansion sind 13 Bänder übereinander
-    }
-  }
-}
 
-head(cft_out)
+dim(cft_out)
+
+# Min- und Max-Werte für jedes Band berechnen (Zur Überprüfung)
+band_min_max <- data.frame(
+  Band = 1:dim(cft_out)[3],  # Bandnummer
+  Min = apply(cft_out[1, , ], 2, min, na.rm = TRUE),  # Minimum für jedes Band
+  Max = apply(cft_out[1, , ], 2, max, na.rm = TRUE)   # Maximum für jedes Band
+)
+
+# Ergebnisse anzeigen
+View(band_min_max)
+
+
 
 # land use file verketten
 # use raster-year as new year (y=307)
@@ -650,5 +734,5 @@ cft_new = read_io(paste0(local_path, "cft_intmod24_deforestation_final.bin"),
                   nstep = 1, endian = "little",                  # endian Sortierung (kleine nach groß)
                   subset = list(year=307))                       # year 307 ist 2006 (erstes Jahr mit modifikation)
 
-plot(subset(cft_new, band = 18))
+plot(subset(cft_new, band = 3))
 print(cft_new)
