@@ -5,8 +5,8 @@ require(FNN)
 library(leaflet)
 #
 ### local path setzen, andere immer auskommentieren ###
-local_path <- "C:/Users/philipp/Documents/TropFor_LPJmL_LokalData/" #philipp
-#local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
+#local_path <- "C:/Users/philipp/Documents/TropFor_LPJmL_LokalData/" #philipp
+local_path <- "/Users/epigo/Documents/LPJmL_Lokal/" #Julius
 #local_path <- "C:/Dokumente/Umweltsysteme/integrierte_modellierung/"  # Mareike
 
 
@@ -504,9 +504,6 @@ cft_stack_world_bs <- stack(lapply(1:64, function(band) {
 
 
 free_vegetation_exttrop <- 1 - calc(cft_stack_world_bs, sum, na.rm = TRUE)
-# Zellflächen berechnen
-cell_areas_freevegetation_exttrop <- calc_cellarea(coords2[, 2], return_unit = "km2")
-
 
 # Koordinaten extrahieren
 coords2 <- coordinates(free_vegetation_exttrop)
@@ -516,6 +513,12 @@ layer_table <- as.data.frame(cft_stack_world[[12]], xy = TRUE, na.rm = FALSE)
 layer_table2 <- as.data.frame(cft_stack_world_bs[[12]], xy = TRUE, na.rm = FALSE)
 
 View(layer_table2)
+
+# Zellflächen berechnen
+cell_areas_freevegetation_exttrop <- calc_cellarea(coords2[, 2], return_unit = "km2")
+
+
+
 
 
 
@@ -527,14 +530,19 @@ layer_table$flaeche_cane <- cell_areas_freevegetation_exttrop * layer_table$cft1
 print(sum(layer_table$flaeche_cane, na.rm = TRUE) - sum(layer_table2$flaeche_cane, na.rm = TRUE))
 
 plot(cft_stack_world_bs[[2]])
-plot(cft_stack_world[[2]])
+plot(cft_stack_world[[15]])
+
+
 
 ##### Input für das Modell vorbereiten (.bin)
 ##### Angelehnt an Skript, das wir am 5.12. im Seminar gemacht haben
 
 writeRaster(cft_stack_world, filename = "cft_in_tropics.tif", format = "GTiff", overwrite = TRUE)
-raster_data = raster("cft_in_tropics.tif")
+raster_data = stack("cft_in_tropics.tif")
+raster_data
 grid_lpjml = read_io(paste0(local_path, "gampe_baseline/grid.bin.json"))
+View(raster_data)
+
 
 # Ein langer Vektor; die X und Y Werte sollen zusammen gebracht werden; Vektor kann dann verwendet werden um nachzuschauen wo welche Zelle ist
 # Für grid und raster Koordinaten (grid und raster Auslesereihenfolge der Zellen ist unterschiedlich. Deswegen muss man über die Koordinaten vorgehen.)
@@ -543,7 +551,6 @@ ras_coords = paste(round(coordinates(raster_data)[,1],2), round(coordinates(rast
 
 # Vektor mit gleichen Sachen und richtiger Reihenfolge
 cft_out = array(0,dim = (c(1,67420,64)))    # 1 Jahr, 67420 Zellen, 64 Bänder
-
 # convert landuse grid (In R) to format needed in LPJmL
 # R: cell - year - band
 # LPJmL: year - cell - band
@@ -554,24 +561,45 @@ for(i in 1:67420){
     names(cft_out[y,i,b]) = names(cft_in$data[i,y,b])  # Name ändern
   }
 }
-
-# cft_out soll an Landnutzungdfile angehangen werden
+View(cft_out)
+# raster stack soll an Landnutzungdfile angehangen werden
 sequence = c(1:64)                                   # die Bänder verwenden wir
 for(band in sequence){
   for(i in 1:length(ras_coords)){
     if(is.na(match(ras_coords[i], grid_coords))){        # no data Abfrage
       next
     }else{
-      cft_out[y, match(ras_coords[i], grid_coords), band] = cft_expansion[[band]][i]       # cft_expansion sind 13 Bänder übereinander
+      cft_out[y, match(ras_coords[i], grid_coords), band] = raster_data[[band]][i]       # cft_expansion sind 13 Bänder übereinander
     }
   }
 }
+
+# Debug-Schleife mit Fortschrittsanzeige
+sequence = c(1:64)  # Die Bänder verwenden wir
+
+for (band in sequence) {
+  cat("Verarbeite Band:", band, "\n")  # Anzeige des aktuellen Bands
+  for (i in 1:length(ras_coords)) {
+    if (is.na(match(ras_coords[i], grid_coords))) {  # No-Data-Abfrage
+      next
+    } else {
+      # Werte zuweisen
+      cft_out[y, match(ras_coords[i], grid_coords), band] <- raster_data[[band]][i]
+    }
+    # Debug-Ausgabe des Fortschritts innerhalb des Bands
+    if (i %% 1000 == 0) {  # Fortschrittsanzeige alle 1000 Schritte
+      cat("  Band", band, "- Zelle:", i, "von", length(ras_coords), "\n")
+    }
+  }
+}
+
+head(cft_out)
 
 # land use file verketten
 # use raster-year as new year (y=307)
 # Jahr öffnen, nehmen, an f.out hängen (306 Jahre)
 # es gibt 306 Jahre. Das 307te Jahr ist so wie das 306te Jahr mit dem Unterschied, dass unsere individuelle Veränderung (z.B. sugar cane in Tropen) dabei ist.
-f.out <- file("cft_intmod24_deforestation.bin", "wb")     # file erstellen und öffnen, ist so lange geöffnet bis es wieder geschlossen wird
+f.out <- file(paste0(local_path, "cft_intmod24_deforestation.bin"), "wb")     # file erstellen und öffnen, ist so lange geöffnet bis es wieder geschlossen wird
 n_year_out = 307
 for(y in 1:n_year_out){
   print(y)
@@ -626,11 +654,11 @@ header_cft_out = create_header(
 )
 
 write_header(filename ="landuse_header.bin", header = header_cft_out, overwrite = TRUE)
-merge_binary_files("landuse_header.bin", "cft_intmod24_deforestation.bin", "cft_intmod24_deforestation_final.bin")
+merge_binary_files("landuse_header.bin", paste0(local_path, "cft_intmod24_deforestation.bin"), paste0(local_path, "cft_intmod24_deforestation_final.bin"))
 
 header_cft_new = read_header("cft_intmod24_deforestation_final.bin")
 
-cft_new = read_io("cft_intmod24_deforestation_final.bin",
+cft_new = read_io(paste0(local_path, "cft_intmod24_deforestation_final.bin"),
                   name = "cft_intmod24_deforestation_final.bin",
                   descr = "LPJLUSE",
                   firstcell = 0, ncell = 67420,                  # es gibt 67420 Zellen auf Land
@@ -641,4 +669,5 @@ cft_new = read_io("cft_intmod24_deforestation_final.bin",
                   nstep = 1, endian = "little",                  # endian Sortierung (kleine nach groß)
                   subset = list(year=307))                       # year 307 ist 2006 (erstes Jahr mit modifikation)
 
-plot(subset(cft_new))
+plot(subset(cft_new, band = 18))
+print(cft_new)
